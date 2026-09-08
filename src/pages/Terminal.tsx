@@ -2,97 +2,122 @@ import { useEffect, useRef } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
+import { Terminal as TerminalIcon } from 'lucide-react';
 
 function TerminalComponent() {
   const terminalRef = useRef(null);
-  const terminal = useRef(null);
-  const fitAddon = useRef(null);
+  const fitAddonRef = useRef<FitAddon | null>(null)
+
+
 
   useEffect(() => {
-    // Initialize terminal
-    terminal.current = new Terminal({
+
+    if (!terminalRef.current) return;
+
+    const terminal = new Terminal({
       cursorBlink: true,
+      fontSize: 13,
+      fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace",
       theme: {
-        background: '#1e1e1e',
-        foreground: '#d4d4d4',
+        background: '#121214',
+        foreground: '#e4e4e7',
+        cursor: '#38bdf8',
+        selectionBackground: '#334155',
+        black: '#18181b',
+        brightBlack: '#71717a',
+        red: '#f87171',
+        green: '#4ade80',
+        yellow: '#facc15',
+        blue: '#60a5fa',
+        magenta: '#c084fc',
+        cyan: '#22d3ee',
+        white: '#f4f4f5',
       },
-      fontSize: 14,
-      rows: 20,
-      cols: 80,
     });
 
-    // Fit addon for responsive sizing
-    fitAddon.current = new FitAddon();
-    terminal.current.loadAddon(fitAddon.current);
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    fitAddonRef.current = fitAddon;
 
-    // Mount terminal
-    terminal.current.open(terminalRef.current);
-    fitAddon.current.fit();
 
-    // Write welcome message
-    terminal.current.writeln('Welcome to React Terminal');
-    terminal.current.writeln('Type something...');
-    terminal.current.write('$ ');
 
-    // Handle user input
-    let inputBuffer = '';
-    terminal.current.onKey((e) => {
-      const char = e.key;
-      
-      // Enter key
-      if (char === '\r') {
-        terminal.current.writeln('');
-        if (inputBuffer.trim() === 'clear') {
-          terminal.current.clear();
-        } else if (inputBuffer.trim() === 'help') {
-          terminal.current.writeln('Commands: clear, help, echo [text]');
-        } else if (inputBuffer.trim().startsWith('echo ')) {
-          const message = inputBuffer.trim().substring(5);
-          terminal.current.writeln(message);
-        } else if (inputBuffer.trim()) {
-          terminal.current.writeln(`Command not found: ${inputBuffer}`);
+    terminal.open(terminalRef.current)
+    fitAddon.fit()
+    terminal.write("Type something to get terminal access")
+
+    let commandInput = "";
+
+    terminal.onData((data) =>{
+      if(data == "\r"){ // enter
+        terminal.writeln("")
+        commandInput = ""
+        terminal.write('$ ');
+      } else if(data == '\x7f'){  // backspace
+        if(commandInput.length > 0){
+          commandInput.slice(0,-1)
+          terminal.write('\b \b');
         }
-        inputBuffer = '';
-        terminal.current.write('$ ');
-        return;
+      } else {
+
+        terminal.write(data)
+        commandInput = data
       }
+      // console.log(data)
+    })
 
-      // Backspace
-      if (char === '\x7f') {
-        if (inputBuffer.length > 0) {
-          inputBuffer = inputBuffer.slice(0, -1);
-          terminal.current.write('\b \b');
-        }
-        return;
-      }
-
-      // Regular character
-      inputBuffer += char;
-      terminal.current.write(char);
-    });
-
-    // Cleanup
-    return () => {
-      terminal.current.dispose();
+     const handleResize = () => {
+      fitAddon.fit();
     };
-  }, []);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (fitAddon.current) {
-        fitAddon.current.fit();
-      }
-    };
+    
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+
+    const resizeObserver = new ResizeObserver(() => {
+      fitAddon.fit();
+    });
+    if (terminalRef.current) {
+      resizeObserver.observe(terminalRef.current);
+    }
+
+
+    return () =>{
+      terminal.dispose();
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+      terminalRef.current = null;
+      fitAddonRef.current = null;
+    }
+
+  }, [])
+
+
+
+
 
   return (
-    <div style={{ padding: '20px', background: '#1e1e1e' }}>
-      <div ref={terminalRef} style={{ width: '100%', height: '400px' }} />
+    <div className="flex flex-col h-full w-full bg-[#121214] select-none">
+      {/* Terminal Tab / Header */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 text-xs select-none">
+        <div className="flex items-center gap-2">
+          <TerminalIcon className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="font-semibold text-zinc-300 text-[11px] tracking-wider uppercase">
+            Terminal
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/50">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            bash
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-zinc-500 font-mono">
+          <span>node v20.x</span>
+        </div>
+      </div>
+
+      {/* Terminal Viewport */}
+      <div className="flex-1 w-full p-2 overflow-hidden bg-[#121214]">
+        <div ref={terminalRef} style={{ width: '100%', height : '100%'}} />
+      </div>
     </div>
   );
 }
 
-export default TerminalComponent;
+export default TerminalComponent;
