@@ -1,32 +1,9 @@
-import { useState } from 'react';
+
 import { Tree } from 'react-arborist';
 import { Folder, FolderPlus, File, FilePlus, ChevronRight, ChevronDown } from 'lucide-react';
 
-const data = [
-  { id: "1", name: "Unread" },
-  { id: "2", name: "Threads" },
-  {
-    id: "3",
-    name: "Chat Rooms",
-    children: [
-      { id: "c1", name: "General" },
-      { id: "c2", name: "Random" },
-      { id: "c3", name: "Open Source Projects" },
-    ],
-  },
-  {
-    id: "4",
-    name: "Direct Messages",
-    children: [
-      { id: "d1", name: "Alice" },
-      { id: "d2", name: "Bob" },
-      { id: "d3", name: "Charlie" },
-    ],
-  },
-];
 
-function FileSidebar() {
-  const [fileName, setFileName] = useState(data);
+function FileSidebar({fileStructure,setSelectedFile} : any) {
 
   const addFolder = () => {
 
@@ -38,9 +15,15 @@ function FileSidebar() {
   function Node({ node, style, tree }: any) {
     const isFolder = node.children && node.children.length > 0;
     const isSelected = node.isSelected;
+    const handleClick = () => {
+    if (!isFolder) {
+      setSelectedFile(node.data.name);
+    }
+  };
 
     return (
       <div
+        onClick={handleClick}
         style={style}
         className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer text-[13px] font-mono select-none transition-colors duration-100 ${
           isSelected
@@ -58,7 +41,7 @@ function FileSidebar() {
         )}
 
         {/* Icon */}
-        <span className="flex-shrink-0">
+        <span className="shrink-0">
           {isFolder ? (
             <Folder className="w-4 h-4 text-amber-400 fill-amber-400/20" />
           ) : (
@@ -102,7 +85,7 @@ function FileSidebar() {
       {/* Tree container */}
       <div className="flex-1 overflow-y-auto p-2">
         <Tree
-          initialData={fileName}
+          initialData={fileStructure}
           width="100%"
           indent={14}
           rowHeight={28}
@@ -114,4 +97,4 @@ function FileSidebar() {
   );
 }
 
-export default FileSidebar;
+export default FileSidebar;

@@ -13,7 +13,11 @@ const filesStructure = [
     }
 ]
 
-function MonacoEditor() {
+
+
+
+function MonacoEditor({selectedFile} : any) {
+
     const [allFileCode,setCurrentAllFileCode] = useState(filesStructure)
     const [currentFile,setCurrentFile] = useState("App.jsx")
     // const editorRef = useRef(null)
@@ -66,17 +70,6 @@ function MonacoEditor() {
                         <FileCode className="w-3.5 h-3.5 text-blue-400" />
                         <span>{currentFile}</span>
                     </div>
-
-                    <div className="relative flex items-center">
-                        <select
-                            value={currentFile}
-                            onChange={(e) => setCurrentFile(e.target.value)}
-                            className="bg-zinc-800 hover:bg-zinc-750 text-zinc-300 text-xs font-mono px-2 py-1 rounded border border-zinc-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                        >
-                            <option value="App.jsx">App.jsx</option>
-                            <option value="File.jsx">File.jsx</option>
-                        </select>
-                    </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-mono">
@@ -91,7 +84,7 @@ function MonacoEditor() {
             {/* Monaco Editor Container */}
             <div className="flex-1 w-full min-h-0">
                 <Editor
-                    key={currentFile}
+                    key={selectedFile}
                     height="100%"
                     // width="20vw"
                     defaultLanguage="javascript"
@@ -110,11 +103,11 @@ function MonacoEditor() {
                         tabSize: 2,
                         padding: { top: 12 }
                     }}
-                    value={(allFileCode.find((file) => file.name == currentFile))?.value}
+                    value={selectedFile}
                 />
             </div>
         </div>
     );
 }
 
-export default MonacoEditor;
+export default MonacoEditor;
