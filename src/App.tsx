@@ -3,6 +3,7 @@ import './App.css'
 
 import Test from "./pages/Test"
 import Homepage from "./pages/Homepage"
+import Challenges from "./pages/Challenges"
 
 
 
@@ -13,8 +14,12 @@ function App() {
       element : <Homepage />
     },
     {
-      path : "/test",
-      element : <Test /> 
+      path : "/challenge/:challengeId",
+      element : <Homepage />
+    },
+    {
+      path : "/challenges",
+      element : <Challenges /> 
     }
   ])
 

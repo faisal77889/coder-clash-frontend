@@ -3,17 +3,17 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { Terminal as TerminalIcon } from 'lucide-react';
+import { useWebSocket } from '../utils/WebContext';
 
 function TerminalComponent() {
   const terminalRef = useRef(null);
-  const fitAddonRef = useRef<FitAddon | null>(null)
-
-
-
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const websocket = useWebSocket(); 
+  
   useEffect(() => {
-
+    
     if (!terminalRef.current) return;
-
+    
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 13,
@@ -34,41 +34,72 @@ function TerminalComponent() {
         white: '#f4f4f5',
       },
     });
-
+    if(!websocket){
+      terminal.write("Failed to connect to server");
+      console.log("Failed to connect");
+      return;
+    };
+    
     const fitAddon = new FitAddon();
+    
     terminal.loadAddon(fitAddon);
+    
     fitAddonRef.current = fitAddon;
-
-
-
+    
+    
+    
+    
     terminal.open(terminalRef.current)
     fitAddon.fit()
     terminal.write("Type something to get terminal access")
+    terminal.writeln("");
+    
+    
+    terminal.write("$ ");
+    websocket.binaryType = "arraybuffer";
+
+    websocket.onmessage = (event) => {
+      console.log("the type of data is  ", typeof (event.data));
+      console.log("event data is ", event.data)
+      const text = typeof event.data === 'string'
+        ? event.data
+        : new TextDecoder().decode(event.data);
+      terminal.write(text);
+      terminal.writeln("");
+      terminal.write("$ ")
+    }
+
 
     let commandInput = "";
 
-    terminal.onData((data) =>{
-      if(data == "\r"){ // enter
+    terminal.onData((data) => {
+      if (data == "\r") { // enter
+        console.log(commandInput)
+        if (websocket.readyState === WebSocket.OPEN) {
+          websocket.send(commandInput);
+        }
         terminal.writeln("")
+
         commandInput = ""
         terminal.write('$ ');
-      } else if(data == '\x7f'){  // backspace
-        if(commandInput.length > 0){
-          commandInput.slice(0,-1)
+      } else if (data == '\x7f') {  // backspace
+        if (commandInput.length > 0) {
+          commandInput.slice(0, -1)
           terminal.write('\b \b');
         }
-      } else {
+      }
+      else {
 
         terminal.write(data)
-        commandInput = data
+        commandInput += data
       }
       // console.log(data)
     })
 
-     const handleResize = () => {
+    const handleResize = () => {
       fitAddon.fit();
     };
-    
+
     window.addEventListener('resize', handleResize);
 
     const resizeObserver = new ResizeObserver(() => {
@@ -79,15 +110,16 @@ function TerminalComponent() {
     }
 
 
-    return () =>{
+    return () => {
       terminal.dispose();
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
       terminalRef.current = null;
       fitAddonRef.current = null;
+      fitAddonRef.current = null;
     }
 
-  }, [])
+  }, [websocket])
 
 
 
@@ -114,10 +146,10 @@ function TerminalComponent() {
 
       {/* Terminal Viewport */}
       <div className="flex-1 w-full p-2 overflow-hidden bg-[#121214]">
-        <div ref={terminalRef} style={{ width: '100%', height : '100%'}} />
+        <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
       </div>
     </div>
   );
 }
 
-export default TerminalComponent;
+export default TerminalComponent;

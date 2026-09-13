@@ -1,9 +1,11 @@
-
 import { Tree } from 'react-arborist';
 import { Folder, FolderPlus, File, FilePlus, ChevronRight, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 
-function FileSidebar({fileStructure,setSelectedFile} : any) {
+function FileSidebar({fileStructure,selectedFile,setSelectedFile} : any) {
+  const [selectedNode,setSelectedNode] = useState("");
+  console.log("the selected File is ",selectedNode);
 
   const addFolder = () => {
 
@@ -13,8 +15,10 @@ function FileSidebar({fileStructure,setSelectedFile} : any) {
   };
 
   function Node({ node, style, tree }: any) {
+    // console.log("Node is : ",node)
     const isFolder = node.children && node.children.length > 0;
     const isSelected = node.isSelected;
+    
     const handleClick = () => {
     if (!isFolder) {
       setSelectedFile(node.data.name);
@@ -85,7 +89,7 @@ function FileSidebar({fileStructure,setSelectedFile} : any) {
       {/* Tree container */}
       <div className="flex-1 overflow-y-auto p-2">
         <Tree
-          initialData={fileStructure}
+          data={fileStructure}
           width="100%"
           indent={14}
           rowHeight={28}
