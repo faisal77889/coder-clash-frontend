@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import FileSidebar from "./FileSidebar";
 import MonacoEditor from "./MonacoEditor";
 import TerminalComponent from "./Terminal";
@@ -31,7 +32,7 @@ const data = [
 ];
 
 const Homepage = () => {
-
+    const navigate = useNavigate();
     const [selectedFile, setSelectedFile] = useState("");
     const [fileStructure, setFileStructure] = useState(data);
     const [showProblem, setShowProblem] = useState(true);
@@ -39,12 +40,18 @@ const Homepage = () => {
     const [wsReady, setWsReady] = useState(false);
 
     useEffect(() => {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
         const ws = new WebSocket(SOCKET_URL);
         ws.onopen = () => setWsReady(true);
         wsRef.current = ws;
 
         return () => ws.close();
-    }, [])
+    }, [navigate]);
 
     return (
         <WebsocketContext.Provider value={wsReady ? wsRef.current : null}>
@@ -52,21 +59,53 @@ const Homepage = () => {
             {/* Top Navigation / App Header */}
             <header className="h-11 border-b border-zinc-800/90 bg-zinc-900/90 backdrop-blur px-4 flex items-center justify-between flex-shrink-0 select-none">
                 <div className="flex items-center gap-2.5">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-md bg-linear-to-tr from-blue-600 to-indigo-500 shadow-sm shadow-blue-500/20">
-                        <Code className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div className="flex items-center gap-2">
+                    <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm shadow-blue-500/20">
+                            <Code className="w-3.5 h-3.5 text-white" />
+                        </div>
                         <span className="font-semibold text-sm tracking-tight text-white">
                             DevForces
                         </span>
-                    </div>
+                    </Link>
+                    <span className="text-zinc-600 text-sm">/</span>
+                    <Link to="/challenges" className="text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
+                        Challenges
+                    </Link>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/50 text-[11px] text-zinc-300 font-medium">
                         <Sparkles className="w-3 h-3 text-amber-400" />
                         Online
                     </span>
+                    {localStorage.getItem("access_token") ? (
+                        <button
+                            onClick={() => {
+                                localStorage.removeItem("access_token");
+                                localStorage.removeItem("token");
+                                localStorage.removeItem("user");
+                                window.location.reload();
+                            }}
+                            className="text-xs text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer px-2 py-1"
+                        >
+                            Log out
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <Link
+                                to="/login"
+                                className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-2 py-1"
+                            >
+                                Log in
+                            </Link>
+                            <Link
+                                to="/signup"
+                                className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors"
+                            >
+                                Sign up
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </header>
 

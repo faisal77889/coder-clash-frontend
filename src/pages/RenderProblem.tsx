@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Markdown from 'react-markdown';
 import { BookOpen } from "lucide-react";
 import { API_URL } from "../Constant";
@@ -7,18 +7,39 @@ import { API_URL } from "../Constant";
 
 const RenderProblem = () => {
     const { challengeId } = useParams();
+    const navigate = useNavigate();
     const [problem, setProblem] = useState<any>(null);
 
     useEffect(() => {
-        fetch(`${API_URL}/challenge?challengeId=${challengeId}`)
-            .then((res) => res.json())
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
+        fetch(`${API_URL}/challenge?challengeId=${challengeId}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        })
+            .then((res) => {
+                if (res.status === 401) {
+                    localStorage.removeItem("access_token");
+                    localStorage.removeItem("token");
+                    navigate("/login");
+                    return null;
+                }
+                return res.json();
+            })
             .then((data) => {
-                setProblem(data);
+                if (data) {
+                    setProblem(data);
+                }
             })
             .catch((err) => {
                 console.error("Error fetching challenge:", err);
             });
-    }, []);
+    }, [challengeId, navigate]);
 
     const getDifficultyBadge = (level: string = "medium") => {
         const normalized = level?.toLowerCase();

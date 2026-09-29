@@ -1,25 +1,32 @@
-import{createBrowserRouter,RouterProvider} from "react-router-dom"
+import { createBrowserRouter, RouterProvider } from "react-router-dom"
 import './App.css'
 
-import Test from "./pages/Test"
 import Homepage from "./pages/Homepage"
 import Challenges from "./pages/Challenges"
-
-
+import Login from "./pages/Login"
+import Signup from "./pages/Signup"
 
 function App() {
   const router = createBrowserRouter([
     {
-      path : "/",
-      element : <Homepage />
+      path: "/",
+      element: <Homepage />
     },
     {
-      path : "/challenge/:challengeId",
-      element : <Homepage />
+      path: "/challenge/:challengeId",
+      element: <Homepage />
     },
     {
-      path : "/challenges",
-      element : <Challenges /> 
+      path: "/challenges",
+      element: <Challenges /> 
+    },
+    {
+      path: "/login",
+      element: <Login />
+    },
+    {
+      path: "/signup",
+      element: <Signup />
     }
   ])
 
@@ -29,3 +36,4 @@ function App() {
 }
 
 export default App
+

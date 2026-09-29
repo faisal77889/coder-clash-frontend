@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Code, Sparkles, Trophy, ArrowRight, Terminal, Flame, Layers } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Code, Sparkles, Trophy, ArrowRight, Terminal, Layers } from "lucide-react";
 import { API_URL } from "../Constant";
 
 interface Challenge {
@@ -12,12 +12,32 @@ interface Challenge {
 }
 
 const Challenges = () => {
+    const navigate = useNavigate();
     const [challenges, setChallenges] = useState<Challenge[]>([]);
 
     useEffect(() => {
-        fetch(`${API_URL}/challenge`)
-            .then((res) => res.json())
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
+        fetch(`${API_URL}/challenge`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        })
+            .then((res) => {
+                if (res.status === 401) {
+                    localStorage.removeItem("access_token");
+                    localStorage.removeItem("token");
+                    navigate("/login");
+                    return null;
+                }
+                return res.json();
+            })
             .then((data) => {
+                if (!data) return;
                 if (Array.isArray(data)) {
                     setChallenges(data);
                 } else if (data && Array.isArray(data.challenges)) {
@@ -27,7 +47,7 @@ const Challenges = () => {
             .catch((err) => {
                 console.error("Error fetching challenges:", err);
             });
-    }, []);
+    }, [navigate]);
 
     const getDifficultyBadge = (level: string = "medium") => {
         const normalized = level.toLowerCase();
@@ -62,6 +82,34 @@ const Challenges = () => {
                         <Sparkles className="w-3 h-3 text-amber-400" />
                         Online
                     </span>
+                    {localStorage.getItem("access_token") ? (
+                        <button
+                            onClick={() => {
+                                localStorage.removeItem("access_token");
+                                localStorage.removeItem("token");
+                                localStorage.removeItem("user");
+                                window.location.reload();
+                            }}
+                            className="text-xs text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer px-2 py-1"
+                        >
+                            Log out
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <Link
+                                to="/login"
+                                className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-2 py-1"
+                            >
+                                Log in
+                            </Link>
+                            <Link
+                                to="/signup"
+                                className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors"
+                            >
+                                Sign up
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </header>
 
