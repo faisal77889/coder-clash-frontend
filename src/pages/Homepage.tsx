@@ -1,177 +1,356 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import FileSidebar from "./FileSidebar";
 import MonacoEditor from "./MonacoEditor";
 import TerminalComponent from "./Terminal";
-import { Code, Sparkles } from "lucide-react";
 import RenderProblem from "./RenderProblem";
-import { SOCKET_URL } from "../Constant";
-import { WebsocketContext } from "../utils/WebContext";
+import { TestResults } from "../components/TestResults";
+import { WebsocketProvider, useWebSocket } from "../utils/WebContext";
+import {
+  Code,
+  BookOpen,
+  FolderTree,
+  CheckCircle2,
+  XCircle,
+  Play,
+  Save,
+  AlertCircle,
+  Terminal as TerminalIcon,
+  Layers,
+} from "lucide-react";
 
-const data = [
-    { id: "1", name: "Unread" },
-    { id: "2", name: "Threads" },
-    {
-        id: "3",
-        name: "Chat Rooms",
-        children: [
-            { id: "c1", name: "General" },
-            { id: "c2", name: "Random" },
-            { id: "c3", name: "Open Source Projects" },
-        ],
-    },
-    {
-        id: "4",
-        name: "Direct Messages",
-        children: [
-            { id: "d1", name: "Alice" },
-            { id: "d2", name: "Bob" },
-            { id: "d3", name: "Charlie" },
-        ],
-    },
-];
+type SidebarTab = "problem" | "files" | "tests";
+type BottomTab = "terminal" | "tests";
+
+const WorkspaceView = () => {
+  const ws = useWebSocket();
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("problem");
+  const [bottomTab, setBottomTab] = useState<BottomTab>("terminal");
+
+  // Keyboard shortcut Ctrl+Enter to run tests
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (ws && !ws.isSubmitting) {
+          ws.submitProblem();
+          setBottomTab("tests");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [ws]);
+
+  // When test results come in, auto switch bottom tab to tests if wanted
+  useEffect(() => {
+    if (ws?.testResults) {
+      setBottomTab("tests");
+    }
+  }, [ws?.testResults]);
+
+  const handleRunTests = () => {
+    if (!ws || ws.isSubmitting) return;
+    ws.submitProblem();
+    setBottomTab("tests");
+  };
+
+  const isConnected = ws?.status === "connected";
+  const isConnecting = ws?.status === "connecting";
+  const isDirty = (ws?.dirtyFiles?.size ?? 0) > 0;
+
+  return (
+    <div className="h-screen w-screen flex flex-col bg-zinc-950 text-zinc-100 overflow-hidden font-sans select-none">
+      {/* Top Navigation / App Header */}
+      <header className="h-12 border-b border-zinc-800/90 bg-zinc-900/90 backdrop-blur px-4 flex items-center justify-between flex-shrink-0 z-20">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+          >
+            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm shadow-blue-500/20">
+              <Code className="w-3.5 h-3.5 text-white" />
+            </div>
+            <span className="font-semibold text-sm tracking-tight text-white">
+              DevForces
+            </span>
+          </Link>
+          <span className="text-zinc-600 text-sm">/</span>
+          <Link
+            to="/challenges"
+            className="text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1.5"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Challenges</span>
+          </Link>
+        </div>
+
+        {/* Center / Action Toolbar */}
+        <div className="flex items-center gap-2">
+          {/* Save All Button */}
+          <button
+            onClick={() => ws?.saveAllFiles()}
+            disabled={!isDirty}
+            title="Save all changes (Ctrl+S)"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              isDirty
+                ? "bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 cursor-pointer shadow-sm"
+                : "bg-zinc-900 text-zinc-500 border border-zinc-800 cursor-not-allowed"
+            }`}
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>Save</span>
+            {isDirty && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            )}
+          </button>
+
+          {/* Run Tests / Submit Button */}
+          <button
+            onClick={handleRunTests}
+            disabled={ws?.isSubmitting || !isConnected}
+            title="Run challenge test suite (Ctrl+Enter)"
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer ${
+              ws?.isSubmitting
+                ? "bg-blue-600/50 text-blue-200 cursor-wait"
+                : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20"
+            }`}
+          >
+            {ws?.isSubmitting ? (
+              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Play className="w-3.5 h-3.5 fill-current" />
+            )}
+            <span>{ws?.isSubmitting ? "Running Tests..." : "Run Tests"}</span>
+          </button>
+
+          {/* Test Status Pill if results exist */}
+          {ws?.testResults && (
+            <div
+              onClick={() => setBottomTab("tests")}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border cursor-pointer ${
+                ws.testResults.numFailedTests === 0
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+              }`}
+            >
+              {ws.testResults.numFailedTests === 0 ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                <XCircle className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {ws.testResults.numPassedTests}/
+                {ws.testResults.numTotalTests} Passed
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Right Status & Profile */}
+        <div className="flex items-center gap-3">
+          {/* WebSocket Status Indicator */}
+          <span
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium ${
+              isConnected
+                ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-400"
+                : isConnecting
+                ? "bg-amber-950/40 border-amber-800/40 text-amber-400"
+                : "bg-rose-950/40 border-rose-800/40 text-rose-400"
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isConnected
+                  ? "bg-emerald-400 animate-pulse"
+                  : isConnecting
+                  ? "bg-amber-400 animate-ping"
+                  : "bg-rose-400"
+              }`}
+            />
+            {isConnected
+              ? "Container Ready"
+              : isConnecting
+              ? "Spinning Container..."
+              : "Disconnected"}
+          </span>
+
+          <button
+            onClick={() => {
+              localStorage.removeItem("access_token");
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+              window.location.reload();
+            }}
+            className="text-xs text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer px-2 py-1"
+          >
+            Log out
+          </button>
+        </div>
+      </header>
+
+      {/* Error Banner if any */}
+      {ws?.error && (
+        <div className="px-4 py-2 bg-rose-950/80 border-b border-rose-800 text-rose-200 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{ws.error}</span>
+        </div>
+      )}
+
+      {/* Main IDE Workspace */}
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden">
+        {/* Left Icon Rail */}
+        <div className="w-12 border-r border-zinc-800/80 h-full bg-zinc-900/80 flex flex-col items-center py-3 gap-2.5 flex-shrink-0 select-none">
+          <button
+            type="button"
+            onClick={() => setSidebarTab("problem")}
+            title="Problem Description"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+              sidebarTab === "problem"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSidebarTab("files");
+              ws?.refreshFolder("/app");
+            }}
+            title="File Explorer"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
+              sidebarTab === "files"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+            }`}
+          >
+            <FolderTree className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSidebarTab("tests")}
+            title="Test Results"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer relative ${
+              sidebarTab === "tests"
+                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {ws?.testResults && (
+              <span
+                className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+                  ws.testResults.numFailedTests === 0
+                    ? "bg-emerald-400"
+                    : "bg-rose-400"
+                }`}
+              />
+            )}
+          </button>
+        </div>
+
+        {/* Left Drawer Content */}
+        <div className="w-[420px] min-w-[280px] max-w-[500px] flex-shrink-0 border-r border-zinc-800/80 bg-zinc-900/40 flex flex-col h-full overflow-hidden">
+          {sidebarTab === "problem" && <RenderProblem />}
+          {sidebarTab === "files" && <FileSidebar />}
+          {sidebarTab === "tests" && <TestResults />}
+        </div>
+
+        {/* Right Area: Monaco Editor (Top) & Terminal/Tests (Bottom) */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-zinc-950">
+          {/* Monaco Editor Section */}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <MonacoEditor />
+          </div>
+
+          {/* Bottom Pane (Terminal & Test Results Tabs) */}
+          <div className="h-64 min-h-[160px] max-h-[48vh] flex-shrink-0 border-t border-zinc-800/90 flex flex-col bg-zinc-950">
+            {/* Bottom Tab Bar */}
+            <div className="flex items-center justify-between px-3 bg-zinc-900 border-b border-zinc-800 text-xs select-none flex-shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setBottomTab("terminal")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors border-b-2 cursor-pointer ${
+                    bottomTab === "terminal"
+                      ? "border-blue-500 text-zinc-100 bg-zinc-950/40"
+                      : "border-transparent text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <TerminalIcon className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Terminal</span>
+                </button>
+
+                <button
+                  onClick={() => setBottomTab("tests")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors border-b-2 cursor-pointer ${
+                    bottomTab === "tests"
+                      ? "border-blue-500 text-zinc-100 bg-zinc-950/40"
+                      : "border-transparent text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Test Results</span>
+                  {ws?.testResults && (
+                    <span
+                      className={`text-[10px] px-1 rounded ${
+                        ws.testResults.numFailedTests === 0
+                          ? "bg-emerald-500/20 text-emerald-300"
+                          : "bg-rose-500/20 text-rose-300"
+                      }`}
+                    >
+                      {ws.testResults.numPassedTests}/
+                      {ws.testResults.numTotalTests}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Content Area */}
+            <div className="flex-1 min-h-0 w-full overflow-hidden">
+              {bottomTab === "terminal" ? (
+                <TerminalComponent />
+              ) : (
+                <TestResults />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Homepage = () => {
-    const navigate = useNavigate();
-    const [selectedFile, setSelectedFile] = useState("");
-    const [fileStructure, setFileStructure] = useState(data);
-    const [showProblem, setShowProblem] = useState(true);
-    const wsRef = useRef<WebSocket | null>(null);
-    const [wsReady, setWsReady] = useState(false);
+  const { challengeId } = useParams();
+  const navigate = useNavigate();
 
-    useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-            navigate("/login");
-            return;
-        }
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
 
-        const ws = new WebSocket(SOCKET_URL);
-        ws.onopen = () => setWsReady(true);
-        wsRef.current = ws;
+    if (!challengeId) {
+      navigate("/challenges");
+      return;
+    }
+  }, [challengeId, navigate]);
 
-        return () => ws.close();
-    }, [navigate]);
+  if (!challengeId) {
+    return null;
+  }
 
-    return (
-        <WebsocketContext.Provider value={wsReady ? wsRef.current : null}>
-        <div className="h-screen w-screen flex flex-col bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
-            {/* Top Navigation / App Header */}
-            <header className="h-11 border-b border-zinc-800/90 bg-zinc-900/90 backdrop-blur px-4 flex items-center justify-between flex-shrink-0 select-none">
-                <div className="flex items-center gap-2.5">
-                    <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-                        <div className="flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-sm shadow-blue-500/20">
-                            <Code className="w-3.5 h-3.5 text-white" />
-                        </div>
-                        <span className="font-semibold text-sm tracking-tight text-white">
-                            DevForces
-                        </span>
-                    </Link>
-                    <span className="text-zinc-600 text-sm">/</span>
-                    <Link to="/challenges" className="text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors">
-                        Challenges
-                    </Link>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/50 text-[11px] text-zinc-300 font-medium">
-                        <Sparkles className="w-3 h-3 text-amber-400" />
-                        Online
-                    </span>
-                    {localStorage.getItem("access_token") ? (
-                        <button
-                            onClick={() => {
-                                localStorage.removeItem("access_token");
-                                localStorage.removeItem("token");
-                                localStorage.removeItem("user");
-                                window.location.reload();
-                            }}
-                            className="text-xs text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer px-2 py-1"
-                        >
-                            Log out
-                        </button>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <Link
-                                to="/login"
-                                className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-2 py-1"
-                            >
-                                Log in
-                            </Link>
-                            <Link
-                                to="/signup"
-                                className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors"
-                            >
-                                Sign up
-                            </Link>
-                        </div>
-                    )}
-                </div>
-            </header>
-
-            {/* Main IDE Workspace */}
-            <div className="flex flex-1 min-h-0 w-full overflow-hidden">
-
-                {/* problem and file selector */}
-                <div className="w-12 border-r border-zinc-800 h-full bg-zinc-900/80 flex flex-col items-center py-2.5 gap-2 flex-shrink-0 select-none">
-                    <button
-                        type="button"
-                        onClick={() => setShowProblem(true)}
-                        aria-label="Code selector"
-                        className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer ${showProblem
-                            ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80"
-                            }`}
-                    >
-                        <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512">
-                            <path d="M360.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm64.6 136.1c-12.5 12.5-12.5 32.8 0 45.3l73.4 73.4-73.4 73.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l96-96c12.5-12.5 12.5-32.8 0-45.3l-96-96c-12.5-12.5-32.8-12.5-45.3 0zm-274.7 0c-12.5-12.5-32.8-12.5-45.3 0l-96 96c-12.5 12.5-12.5 32.8 0 45.3l96 96c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 150.6 182.6c12.5-12.5 12.5-32.8 0-45.3z" />
-                        </svg>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setShowProblem(false)}
-                        aria-label="File selector"
-                        className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer ${!showProblem
-                            ? "bg-zinc-800 text-zinc-100 shadow-sm"
-                            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80"
-                            }`}
-                    >
-                        <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
-                            <path d="M176 48L64 48c-8.8 0-16 7.2-16 16l0 384c0 8.8 7.2 16 16 16l256 0c8.8 0 16-7.2 16-16l0-240-88 0c-39.8 0-72-32.2-72-72l0-88zM316.1 160L224 67.9 224 136c0 13.3 10.7 24 24 24l68.1 0zM0 64C0 28.7 28.7 0 64 0L197.5 0c17 0 33.3 6.7 45.3 18.7L365.3 141.3c12 12 18.7 28.3 18.7 45.3L384 448c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64z" />
-                        </svg>
-                    </button>
-                </div>
-
-                {/* File Sidebar (Left) */}
-                {!showProblem && (
-                    <div className="w-64 min-w-[200px] max-w-[300px] flex-shrink-0 border-r border-zinc-800 bg-zinc-900/40 flex flex-col h-full overflow-hidden">
-                        <FileSidebar fileStructure={fileStructure} selectedFile={selectedFile} setSelectedFile={setSelectedFile} />
-                    </div>
-                )}
-
-                {/* Render Problem */}
-                {showProblem && (
-                    <div className="w-[450px] min-w-[320px] max-w-[550px] flex-shrink-0 border-r border-zinc-800 bg-zinc-900/40 flex flex-col h-full overflow-hidden">
-                        <RenderProblem />
-                    </div>
-                )}
-
-                {/* Editor and Terminal (Right) */}
-                <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-zinc-950">
-                    {/* Monaco Editor Section */}
-                    <div className="flex-1 min-h-0 flex flex-col">
-                        <MonacoEditor selectedFile={selectedFile} />
-                    </div>
-                    {/* Terminal Section */}
-                    <div className="h-64 min-h-[160px] max-h-[45vh] flex-shrink-0 border-t border-zinc-800 flex flex-col">
-                        <TerminalComponent />
-                    </div>
-                </div>
-            </div>
-        </div>
-        </WebsocketContext.Provider>
-    );
+  return (
+    <WebsocketProvider challengeId={challengeId}>
+      <WorkspaceView />
+    </WebsocketProvider>
+  );
 };
 
 export default Homepage;
